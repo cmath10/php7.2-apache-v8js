@@ -1,0 +1,30 @@
+version: '3.6'
+services:
+  main:
+    image: "php7.2-apache-v8js"
+    ports:
+      - "4000:80"
+      - "4003:443"
+    volumes:
+      - type: bind
+        source: .
+        target: /var/www/php7.2-apache-v8js
+    environment:
+      - XDEBUG_CONFIG=remote_enable=1 remote_mode=req remote_host=${ip} remote_port=9000 idekey=phpstorm remote_connect_back=0
+
+  console:
+    image: "php7.2-apache-v8js-console"
+    depends_on:
+      - main
+    volumes:
+      - type: bind
+        source: .
+        target: /var/www/php7.2-apache-v8js
+      - type: bind
+        source: "$SSH_AUTH_SOCK"
+        target: /ssh-auth.sock
+    environment:
+      - UID=${uid}
+      - GID=${gid}
+      - SSH_AUTH_SOCK=/ssh-auth.sock
+      - XDEBUG_CONFIG=remote_enable=1 remote_mode=req remote_host=${ip} remote_port=9000 idekey=phpstorm remote_connect_back=0

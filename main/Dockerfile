@@ -2,8 +2,6 @@ FROM php:7.2.14-apache
 
 MAINTAINER Zaytzev.Kirill@yandex.ru
 
-ENV TIMEZONE "Europe/Moscow"
-
 
 # Packages
 
@@ -73,9 +71,13 @@ RUN apt-get update \
     xdg-utils \
     zlib1g-dev
 
+RUN docker-php-ext-install mbstring zip bcmath xml curl
+
+
 # V8JS
 
 ENV V8_VERSION=7.4.288.21
+
 RUN cd /tmp \
     && git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git --progress --verbose \
     && export PATH="$PATH:/tmp/depot_tools" \
@@ -113,50 +115,44 @@ RUN git clone https://github.com/phpv8/v8js.git /tmp/v8js \
     && ./configure LDFLAGS="-lstdc++" --with-v8js=/opt/libv8-7.4 \
     && make all test install
 
-RUN docker-php-ext-configure gd --with-freetype-dir=/usr/include/freetype2 --with-jpeg-dir=/usr/include/ --with-png-dir=/usr/include/ \
-    && docker-php-ext-configure intl \
-    && docker-php-ext-install pdo pdo_mysql gd mbstring zip intl bcmath xml curl \
-    && docker-php-ext-enable v8js \
-    && pecl install xdebug \
+RUN docker-php-ext-enable v8js
+
+
+# Xdebug
+
+RUN pecl install xdebug \
     && docker-php-ext-enable xdebug \
     && echo "xdebug.remote_enable=on" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
-    && echo "xdebug.remote_autostart=off" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini \
-    && pecl install mongodb-1.3.4 \
-    && docker-php-ext-enable mongodb \
-    && curl -LO https://github.com/wcgallego/pecl-gearman/archive/gearman-2.0.5.tar.gz \
-    && tar xf gearman-2.0.5.tar.gz \
-    && cd pecl-gearman-gearman-2.0.5/ \
-    && phpize && ./configure \
-    && make && make install \
-    && docker-php-ext-enable gearman \
-    && cd ../ && rm -r pecl-gearman-gearman-2.0.5/
+    && echo "xdebug.remote_autostart=off" >> /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
 
 
 # Clean apt-get cache
 
-RUN apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+RUN apt-get autoremove -y && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 
 # Timezone
 
+ENV TIMEZONE "Europe/Moscow"
 RUN echo "${TIMEZONE}" > /etc/timezone && dpkg-reconfigure -f noninteractive tzdata
+
+
+# Composer
+
+RUN curl -sS https://getcomposer.org/installer | php && mv composer.phar /usr/local/bin/composer
 
 
 # Configuration
 
-COPY config/apache/sites-available /etc/apache2/sites-available/
 COPY config/apache /etc/apache2/
 COPY config/php /usr/local/etc/php/
 
-EXPOSE 8080
-
-RUN a2dissite 000-default \
-    && a2ensite web \
-    && a2enmod rewrite \
+RUN a2enmod rewrite \
     && a2enmod headers \
     && a2enmod ssl \
     && a2enmod deflate
+
+# Locale
 
 RUN sed -i -e 's/# ru_RU.UTF-8 UTF-8/ru_RU.UTF-8 UTF-8/' /etc/locale.gen && \
     dpkg-reconfigure --frontend=noninteractive locales && \
@@ -164,3 +160,4 @@ RUN sed -i -e 's/# ru_RU.UTF-8 UTF-8/ru_RU.UTF-8 UTF-8/' /etc/locale.gen && \
 
 ENV LANG ru_RU.UTF-8 
 
+EXPOSE 8080
